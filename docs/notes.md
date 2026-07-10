@@ -1,13 +1,14 @@
 # Notes
 
 ## Purpose
-This repository contains Azure PowerShell scripts used for VM start/stop, resizing, backup restore validation, and Azure Virtual Desktop session host registration.
+This repository contains Azure PowerShell scripts used for VM start/stop, resizing, backup restore validation, Azure Virtual Desktop session host registration, and NSG isolation.
 
 ## Prerequisites
 - PowerShell 7+
 - Az PowerShell module
 - Appropriate Azure RBAC permissions for Azure management scripts
 - Local administrator credentials and WinRM access for AVD session host registration
+- Network Contributor permissions to create and attach NSGs for the isolation script
 
 ## Authentication
 - Azure management scripts should use an interactive Azure login via `Connect-AzAccount` or an appropriately configured service principal / managed identity.

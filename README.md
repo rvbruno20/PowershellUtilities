@@ -5,6 +5,7 @@ This repository contains a small set of PowerShell scripts for common Azure admi
 ## What is in this repository?
 
 - `scripts/avd_hostpool_registration.ps1` - Connects to an AVD session host over WinRM, installs required AVD agent packages, and registers the host using a provided registration token.
+- `scripts/azure_nsg_isolation.ps1` - Creates an emergency deny-all NSG and attaches it to all VMs across accessible subscriptions to isolate network traffic.
 - `scripts/azure_vm_resize.ps1` - Resizes an Azure virtual machine by switching to the correct subscription, deallocating the VM if needed, updating its size, and restarting it.
 - `scripts/automation_account/azure_sp_certificate_audit.ps1` - Audits Azure service principal certificates for expiration and validity.
 - `scripts/automation_account/azure_sp_secret_audit.ps1` - Audits Azure service principal secrets for expiration and validity.
