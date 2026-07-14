@@ -1,43 +1,85 @@
-# Connect to Azure using the current signed-in identity.
-Connect-AzAccount
 
-# Inspect the active Azure context and subscription.
-$context = Get-AzContext
+param (
+    [bool]$DryRun = $false
+)
 
-# Configuration values for the target VM and desired size.
-$subscriptionName = "<subscription-name>"
-$virtualMachineName = "<virtual-machine-name>"
-$newVMSize = "<new-vm-size>"
+# ==============================
+# CONFIGURATION
+# ==============================
+$Subscription = "<subscription-name>"
 
-# Ensure the correct subscription is selected before making changes.
-if ($context.Subscription.Name -ne $subscriptionName) {
-    Set-AzContext -Subscription $subscriptionName | Out-Null
-    $context = Get-AzContext
+$VmResizePlan = @(
+    @{
+        ResourceGroup = "<resource-group-name>"
+        VMName        = "<vm-name>"
+        TargetSize    = "<target-size>"
+    }
+)
+
+Write-Output "=== Azure VM Resize Script (Interactive Login) ==="
+Write-Output "             DryRun mode: $DryRun"
+Write-Output "=================================================="
+
+# ==============================
+# AUTHENTICATION
+# ==============================
+Connect-AzAccount -Identity
+Write-Output "Setting Subscription"
+Set-AzContext -Subscription $Subscription
+
+# ==============================
+# PROCESS EACH VM
+# ==============================
+foreach ($vmPlan in $VmResizePlan) {
+
+    Write-Output "---------------------------------------------"
+    Write-Output "VM Name        : $($vmPlan.VMName)"
+    Write-Output "Resource Group : $($vmPlan.ResourceGroup)"
+    Write-Output "Target Size    : $($vmPlan.TargetSize)"
+    Write-Output "---------------------------------------------"
+
+    $vm = Get-AzVM `
+        -ResourceGroupName $vmPlan.ResourceGroup `
+        -Name $vmPlan.VMName `
+        -Status
+
+    $currentSize = $vm.HardwareProfile.VmSize
+    $powerState  = $vm.PowerState
+
+    Write-Output "Current Size   : $currentSize"
+    Write-Output "Power State    : $powerState"
+
+    if ($currentSize -eq $vmPlan.TargetSize) {
+        Write-Output "VM already at desired size. Skipping."
+        continue
+    }
+
+    if ($DryRun) {
+        Write-Output "[DRY-RUN] VM would be stopped (if running)"
+        Write-Output "[DRY-RUN] VM would be resized to $($vmPlan.TargetSize)"
+        Write-Output "[DRY-RUN] VM would be started again"
+        continue
+    }
+
+    if ($powerState -ne "VM deallocated") {
+        Write-Output "Stopping VM..."
+        Stop-AzVM `
+            -ResourceGroupName $vmPlan.ResourceGroup `
+            -Name $vmPlan.VMName `
+            -Force
+    }
+
+    Write-Output "Resizing VM..."
+    $vm.HardwareProfile.VmSize = $vmPlan.TargetSize
+    Update-AzVM `
+        -ResourceGroupName $vmPlan.ResourceGroup `
+        -VM $vm
+
+    Write-Output "Starting VM..."
+    Start-AzVM `
+        -ResourceGroupName $vmPlan.ResourceGroup `
+        -Name $vmPlan.VMName
 }
 
-# Retrieve the VM details and status once.
-$vm = Get-AzVM -Name $virtualMachineName -Status -ErrorAction SilentlyContinue
-if (-not $vm) {
-    Write-Warning "VM '$virtualMachineName' was not found in subscription '$subscriptionName'."
-    exit 1
-}
-
-# Determine the current power state from the retrieved VM object.
-$powerState = $vm.PowerState
-
-# Deallocate the VM before resizing if it is currently running.
-if ($powerState -like '*running*') {
-    Write-Output "Deallocating Azure VM '$($vm.Name)' before resizing."
-    Stop-AzVM -ResourceGroupName $vm.ResourceGroupName -Name $vm.Name -Force -ErrorAction Stop | Out-Null
-}
-
-# Reload the VM model and update the size.
-$vmToUpdate = Get-AzVM -Name $virtualMachineName -ResourceGroupName $vm.ResourceGroupName -ErrorAction Stop
-$vmToUpdate.HardwareProfile.VmSize = $newVMSize
-
-# Apply the VM size change.
-Update-AzVM -ResourceGroupName $vm.ResourceGroupName -VM $vmToUpdate -ErrorAction Stop
-
-# Start the VM after the resize completes.
-Start-AzVM -ResourceGroupName $vm.ResourceGroupName -Name $virtualMachineName -ErrorAction Stop | Out-Null
-Write-Output "Resize completed for VM '$virtualMachineName'. New size: $newVMSize"
+Write-Output ""
+Write-Output "=== Script completed ==="
