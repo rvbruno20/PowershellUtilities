@@ -1,51 +1,59 @@
 # Azure PowerShell Scripts
 
-This repository contains a small set of PowerShell scripts for common Azure administration and automation tasks. The scripts are intended to help with VM management, operational validation, restore testing, and Azure Virtual Desktop session host registration.
+This repository contains a set of PowerShell scripts for Azure administration, operational auditing, and general automation tasks. The scripts are intended to support day-to-day Azure operations such as VM lifecycle management, backup validation, storage security checks, private endpoint work, and Azure Virtual Desktop host onboarding.
 
-## What is in this repository?
+## Repository layout
 
-- `scripts/avd_hostpool_registration.ps1` - Connects to an AVD session host over WinRM, installs required AVD agent packages, and registers the host using a provided registration token.
-- `scripts/azure_nsg_isolation.ps1` - Creates an emergency deny-all NSG and attaches it to all VMs across accessible subscriptions to isolate network traffic.
-- `scripts/azure_vm_resize.ps1` - Resizes an Azure virtual machine by switching to the correct subscription, deallocating the VM if needed, updating its size, and restarting it.
-- `scripts/automation_account/azure_sp_certificate_audit.ps1` - Audits Azure service principal certificates for expiration and validity.
-- `scripts/automation_account/azure_sp_secret_audit.ps1` - Audits Azure service principal secrets for expiration and validity.
-- `scripts/automation_account/azure_vm_start_aa.ps1` - Starts an Azure VM using automation account credentials or context.
-- `scripts/automation_account/azure_vm_stop_aa.ps1` - Stops an Azure VM using automation account credentials or context.
-- `scripts/service_principal/azure_backup_restore_test.ps1` - Validates a backup-and-restore workflow by authenticating to Azure, restoring a VM from Recovery Services, and cleaning up temporary restore resources.
-- `scripts/service_principal/azure_vm_decommission.ps1` - Decommissions a VM and related resources such as disks and network interfaces using service principal authentication.
+- [scripts/azure](scripts/azure) contains the Azure-focused automation scripts.
+- [scripts/miscellaneous](scripts/miscellaneous) contains general-purpose helper scripts.
+- [docs](docs) contains supporting notes and documentation.
+
+## Script inventory
+
+| Script | Purpose | Notes |
+| --- | --- | --- |
+| [scripts/azure/avd_hostpool_registration.ps1](scripts/azure/avd_hostpool_registration.ps1) | Registers an Azure Virtual Desktop session host over WinRM. | Requires remote PowerShell access and local administrator credentials on the target host. |
+| [scripts/azure/azure_backup_restore_test.ps1](scripts/azure/azure_backup_restore_test.ps1) | Tests Azure VM backup and restore workflows. | Uses a service principal, creates temporary restore resources, and removes them afterward. |
+| [scripts/azure/azure_nsg_isolation.ps1](scripts/azure/azure_nsg_isolation.ps1) | Applies an emergency deny-all NSG to VMs in accessible subscriptions. | Destructive by design; use with caution. |
+| [scripts/azure/azure_public_ip_audit.ps1](scripts/azure/azure_public_ip_audit.ps1) | Audits public IP addresses across subscriptions. | Writes results to a configurable CSV path. |
+| [scripts/azure/azure_remove_group_zero_users.ps1](scripts/azure/azure_remove_group_zero_users.ps1) | Reviews Microsoft 365 groups and logs or removes groups with no members. | Requires Microsoft Graph connectivity and appropriate permissions. |
+| [scripts/azure/azure_sa_tls_audit.ps1](scripts/azure/azure_sa_tls_audit.ps1) | Ensures storage accounts are configured to use TLS 1.2 minimum. | Reads a list of storage accounts from a file and updates each subscription context. |
+| [scripts/azure/azure_sp_certificate_audit.ps1](scripts/azure/azure_sp_certificate_audit.ps1) | Audits application registrations for expiring certificates. | Sends notifications through a Slack webhook when issues are detected. |
+| [scripts/azure/azure_sp_secret_audit.ps1](scripts/azure/azure_sp_secret_audit.ps1) | Audits application registrations for expiring secrets. | Similar to the certificate audit but for client secrets. |
+| [scripts/azure/azure_vm_decommission.ps1](scripts/azure/azure_vm_decommission.ps1) | Removes a VM and dependent resources such as disks and NICs. | Uses service principal authentication and is destructive. |
+| [scripts/azure/azure_vm_resize.ps1](scripts/azure/azure_vm_resize.ps1) | Resizes one or more Azure VMs. | Supports a DryRun mode via the script parameter. |
+| [scripts/azure/azure_vm_start_aa.ps1](scripts/azure/azure_vm_start_aa.ps1) | Starts VMs from an Automation Account managed identity context. | Useful for scheduled start operations. |
+| [scripts/azure/azure_vm_stop_aa.ps1](scripts/azure/azure_vm_stop_aa.ps1) | Stops VMs from an Automation Account managed identity context. | Useful for scheduled stop operations. |
+| [scripts/azure/create-private-endpoint.ps1](scripts/azure/create-private-endpoint.ps1) | Creates private endpoints for storage accounts from a CSV file. | Requires a target VNet, subnet, and resource group. |
+| [scripts/azure/get_unused_private_endpoints.ps1](scripts/azure/get_unused_private_endpoints.ps1) | Identifies private endpoints that do not appear to be in use. | Exports results to CSV when an output path is provided. |
+| [scripts/azure/storage-account-public-access.ps1](scripts/azure/storage-account-public-access.ps1) | Audits or remediates storage accounts that allow public network access. | Uses a local variables file and expects additional configuration values. |
+| [scripts/miscellaneous/password_generator.ps1](scripts/miscellaneous/password_generator.ps1) | Generates a random password through a public API. | Useful for supplying temporary secret values to other automation workflows. |
 
 ## Prerequisites
 
 Before running these scripts, ensure that:
 
-- You have PowerShell installed.
+- PowerShell 5.1 or later is available.
 - The Az PowerShell module is installed.
-- The Microsoft Graph PowerShell module (`Microsoft.Graph`) is installed if any script relies on Graph data.
-- You are authenticated to Azure and have the required permissions for the resources being managed.
-- For AVD session host registration, the machine running the script must be able to communicate with the session host over WinRM and must have local administrator credentials for the remote host.
+- The Microsoft Graph PowerShell module is installed when a script uses Microsoft Graph.
+- You have an authenticated Azure session or the required automation identity available.
+- You have the Azure RBAC permissions needed for the specific operation.
 
-Install the Azure PowerShell module if needed:
+Install the main dependencies with:
 
 ```powershell
 Install-Module Az -Scope CurrentUser -Repository PSGallery
-```
-
-Install the Microsoft Graph PowerShell module if needed:
-
-```powershell
 Install-Module Microsoft.Graph -Scope CurrentUser -Repository PSGallery
 ```
 
 ## Authentication
 
-These scripts typically rely on either:
+These scripts use one of the following approaches:
 
-- Your currently signed-in Azure session via `Connect-AzAccount`, or
-- A service principal configured with the necessary RBAC permissions.
-
-The AVD host registration script does not authenticate to Azure directly; it connects to the remote session host using WinRM and local admin credentials.
-
-If you are using a service principal for other scripts, update the placeholder values in the script before execution.
+- Interactive sign-in with Connect-AzAccount for ad-hoc administration.
+- Service principal authentication for scripted or automation-driven operations.
+- Managed identity authentication for Azure Automation scenarios.
+- WinRM and local administrator credentials for the AVD host registration workflow.
 
 ## Required permissions
 
